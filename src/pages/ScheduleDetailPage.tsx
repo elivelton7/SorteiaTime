@@ -20,11 +20,27 @@ type DetailTab = 'players' | 'attendance' | 'draw'
 function initials(name: string) {
     return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
 }
-function StarsRow({ value }: { value: number }) {
+function StarsRow({ value, size = 12 }: { value: number; size?: number }) {
     return (
-        <span style={{ fontSize: 13, letterSpacing: '-0.5px', lineHeight: 1 }}>
-            <span style={{ color: '#f59e0b' }}>{'★'.repeat(value)}</span>
-            <span style={{ color: '#e5e7eb' }}>{'★'.repeat(5 - value)}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 1, verticalAlign: 'middle' }}>
+            {[1, 2, 3, 4, 5].map(star => {
+                const isFull = value >= star
+                const isHalf = !isFull && value >= star - 0.5
+                return (
+                    <svg key={star} width={size} height={size} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                        <defs>
+                            <linearGradient id="globalHalfStarGrad">
+                                <stop offset="50%" stopColor="#f59e0b" />
+                                <stop offset="50%" stopColor="#e5e7eb" />
+                            </linearGradient>
+                        </defs>
+                        <path
+                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                            fill={isFull ? '#f59e0b' : isHalf ? 'url(#globalHalfStarGrad)' : '#e5e7eb'}
+                        />
+                    </svg>
+                )
+            })}
         </span>
     )
 }
@@ -348,11 +364,9 @@ function PlayersTab({ scheduleId, players, loading, onRefresh }: {
                         <button type="button" className={`pos-btn ${form.position === 'linha' ? 'active' : ''}`} onClick={() => setForm(f => ({ ...f, position: 'linha' }))}>⚽ Linha</button>
                     </div>
                 </div>
-                <div className="form-group"><label className="form-label">Nível de habilidade</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <StarRating value={form.stars} onChange={n => setForm(f => ({ ...f, stars: n }))} size={28} />
-                        <span style={{ fontSize: 13, color: '#6b7280' }}>{form.stars}/5</span>
-                    </div>
+                <div className="form-group">
+                    <label className="form-label">Nível de habilidade</label>
+                    <StarRating value={form.stars} onChange={n => setForm(f => ({ ...f, stars: n }))} size={28} />
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                     <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalOpen(false)}>Cancelar</button>

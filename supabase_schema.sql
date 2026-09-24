@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS players (
   name        text NOT NULL,
   nickname    text,
   position    player_position NOT NULL DEFAULT 'linha',
-  stars       integer NOT NULL DEFAULT 0 CHECK (stars >= 0 AND stars <= 5),
+  stars       numeric(3,1) NOT NULL DEFAULT 3 CHECK (stars >= 0 AND stars <= 5),
   is_active   boolean NOT NULL DEFAULT true,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
