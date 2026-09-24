@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Plus, Pencil, Trash2, Shuffle, AlertTriangle, Copy, Check } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ArrowLeft, Plus, Pencil, Trash2, Shuffle, AlertTriangle, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Player, GameSchedule, MatchAttendee, PlayerPosition, AttendanceStatus } from '../types'
@@ -28,13 +28,107 @@ function StarsRow({ value }: { value: number }) {
         </span>
     )
 }
+
+function toLocalDateString(d: Date): string {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
 function nextOccurrence(dayOfWeek: number) {
     const today = new Date()
     // diff = 0 means today is the scheduled day → show today
     const diff = (dayOfWeek - today.getDay() + 7) % 7
-    const d = new Date(today)
-    d.setDate(today.getDate() + diff)
-    return d.toISOString().slice(0, 10)
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff)
+    return toLocalDateString(d)
+}
+
+function GameDateSelector({
+    dayOfWeek,
+    value,
+    onChange,
+}: {
+    dayOfWeek: number
+    value: string
+    onChange: (date: string) => void
+}) {
+    const changeWeek = (offset: number) => {
+        const [y, m, d] = value.split('-').map(Number)
+        const current = new Date(y, m - 1, d)
+        current.setDate(current.getDate() + offset * 7)
+        onChange(toLocalDateString(current))
+    }
+
+    const options = useMemo(() => {
+        const today = new Date()
+        const diff = (dayOfWeek - today.getDay() + 7) % 7
+        const base = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff)
+        const list: { iso: string; label: string }[] = []
+        for (let i = -6; i <= 10; i++) {
+            const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i * 7)
+            const iso = toLocalDateString(d)
+            const dayName = DAYS[dayOfWeek]
+            const formatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+            const tag = i === 0 ? ' (Próximo jogo)' : i === -1 ? ' (Jogo anterior)' : ''
+            list.push({
+                iso,
+                label: `${dayName}, ${formatted}${tag}`,
+            })
+        }
+        return list
+    }, [dayOfWeek])
+
+    const currentOption = options.find(o => o.iso === value)
+
+    return (
+        <div style={{ padding: '12px 16px 8px' }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                Data da partida ({DAYS[dayOfWeek]})
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                    type="button"
+                    onClick={() => changeWeek(-1)}
+                    title="Semana anterior"
+                    style={{
+                        padding: '10px 12px', borderRadius: 10, border: '1.5px solid #e5e7eb',
+                        background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', color: '#4b5563', flexShrink: 0,
+                    }}
+                >
+                    <ChevronLeft size={18} />
+                </button>
+
+                <select
+                    className="form-input"
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    style={{ flex: 1, padding: '10px 12px', fontSize: 14, fontWeight: 700, color: '#111827', background: 'white' }}
+                >
+                    {!currentOption && <option value={value}>{value}</option>}
+                    {options.map(opt => (
+                        <option key={opt.iso} value={opt.iso}>
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
+
+                <button
+                    type="button"
+                    onClick={() => changeWeek(1)}
+                    title="Próxima semana"
+                    style={{
+                        padding: '10px 12px', borderRadius: 10, border: '1.5px solid #e5e7eb',
+                        background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', color: '#4b5563', flexShrink: 0,
+                    }}
+                >
+                    <ChevronRight size={18} />
+                </button>
+            </div>
+        </div>
+    )
 }
 
 // ══════════════════════════════════════════════
@@ -406,11 +500,11 @@ function AttendanceTab({ schedule, players }: { schedule: GameSchedule; players:
 
     return (
         <div>
-            {/* Date picker */}
-            <div style={{ padding: '12px 16px 8px' }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Data do jogo</label>
-                <input className="form-input" type="date" value={dateInput} onChange={e => setDateInput(e.target.value)} style={{ padding: '9px 12px' }} />
-            </div>
+            <GameDateSelector
+                dayOfWeek={schedule.day_of_week}
+                value={dateInput}
+                onChange={setDateInput}
+            />
 
             {/* Summary – 2 columns only */}
             <div style={{ margin: '0 16px 10px', background: '#f9fafb', borderRadius: 12, padding: '10px 14px' }}>
@@ -623,10 +717,12 @@ function DrawTab({ schedule, players }: { schedule: GameSchedule; players: Playe
 
     return (
         <div style={{ padding: '12px 16px' }}>
-            {/* Date picker */}
-            <div className="form-group">
-                <label className="form-label">Data do jogo</label>
-                <input className="form-input" type="date" value={dateInput} onChange={e => setDateInput(e.target.value)} style={{ padding: '9px 12px' }} />
+            <div style={{ margin: '0 -16px 8px' }}>
+                <GameDateSelector
+                    dayOfWeek={schedule.day_of_week}
+                    value={dateInput}
+                    onChange={setDateInput}
+                />
             </div>
 
             {/* Stats panel */}
